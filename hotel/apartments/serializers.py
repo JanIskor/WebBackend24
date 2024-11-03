@@ -2,22 +2,8 @@ from rest_framework import serializers
 # from argon2 import hash_password
 from .models import ApartHotelService, Application, ApplicationApartments
 from django.contrib.auth.models import User
+from collections import OrderedDict
 
-
-# class UserSerializer(serializers.ModelSerializer):
-#     application_set = ApplicationSerializer(many=True, read_only=True)
-#     password = serializers.CharField(write_only=True)
-
-#     class Meta:
-#         model = AuthUser
-#         fields = ["id", "first_name", "last_name", "username", "email", "password", "application_set"]
-
-#     def create(self, validated_data):
-#         # Создаем нового пользователя
-#         user = AuthUser(**validated_data)
-#         user.password = validated_data['password']
-#         user.save()
-#         return user
 
 class ApplicationSerializer(serializers.ModelSerializer):
   create_date = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
@@ -41,6 +27,12 @@ class ApartHotelServiceSerializer(serializers.ModelSerializer):
                     'id', 'name', 'description', 'image', 
                     'price', 'details'
             ]
+        def get_fields(self):
+            new_fields = OrderedDict()
+            for name, field in super().get_fields().items():
+                field.required = False
+                new_fields[name] = field
+            return new_fields
         
 
 class ApplicationApartmentsSerializer(serializers.ModelSerializer):

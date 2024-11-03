@@ -19,7 +19,15 @@ from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login, logout
 
 from .serializers import ApplicationSerializer, ApartHotelServiceSerializer, ApplicationApartmentsSerializer, UserSerializer
-  
+
+from drf_yasg.utils import swagger_auto_schema
+from rest_framework.viewsets import ModelViewSet
+from django.http import HttpResponse
+from rest_framework.permissions import AllowAny
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import permission_classes, authentication_classes
+
+
 def index_apart_hotel(request):
     
     apartment_name = request.GET.get('apartment_name', '')
@@ -168,7 +176,33 @@ def search_application(request):
 
     return Response(serializer.data)
 
+class UserViewSet(ModelViewSet):
+    """Класс, описывающий методы работы с пользователями
+    Осуществляет связь с таблицей пользователей в базе данных
+    """
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    model_class = User
 
+    def create(self, request):
+        """
+        Функция регистрации новых пользователей
+        Если пользователя c указанным в request username ещё нет, в БД будет добавлен новый пользователь.
+        """
+        if self.model_class.objects.filter(username=request.data['username']).exists():
+            return Response({'status': 'Exist'}, status=400)
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            print(serializer.data)
+            self.model_class.objects.create_user(username=serializer.data['username'],
+                                                 password=serializer.data['password'],
+                                                 is_staff=serializer.data['is_staff'],
+                                                 is_superuser=serializer.data['is_superuser'])
+
+            return Response({'status': 'Success'}, status=200)
+        return Response({'status': 'Exist', 'error': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+# ////////////
 class ApplicationApartmentsList(APIView):
     model_class = ApplicationApartments
     serializer_class = ApplicationApartmentsSerializer
@@ -246,6 +280,7 @@ class ApartHotelServiceDetail(APIView):
         serializer = self.serializer_class(apart_hotel_service)
         return Response(serializer.data)
 
+    @swagger_auto_schema(request_body=ApartHotelServiceSerializer)
     # Обновляет информацию об услугах в апарт-отеле (для модератора)
     def put(self, request, id_apartments, format=None):
         apart_hotel_service = get_object_or_404(self.model_class, id=id_apartments)
@@ -496,20 +531,38 @@ class UserDetail(APIView):
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-class UserLoginView(APIView):
-    def post(self, request, format=None):
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(username=username, password=password)
-        if user is not None:
-            login(request, user)
-            return Response({"message": "Вход успешен."}, status=status.HTTP_200_OK)
-        return Response({"error": "Неверные данные."}, status=status.HTTP_401_UNAUTHORIZED)
+@permission_classes([AllowAny])
+@authentication_classes([])
+@csrf_exempt
+@swagger_auto_schema(method='post', request_body=UserSerializer)
+@api_view(['Post'])
+def login_view(request):
+    username = request.data["username"]  # допустим передали username и password
+    password = request.data["password"]
+    user = authenticate(request, username=username, password=password)
+    if user is not None:
+        login(request, user)
+        return HttpResponse("{'status': 'ok'}")
+    else:
+        return HttpResponse("{'status': 'error', 'error': 'login failed'}")
+
+def logout_view(request):
+    logout(request._request)
+    return Response({'status': 'Success'})
+# class UserLoginView(APIView):
+#     def post(self, request, format=None):
+#         username = request.data.get('username')
+#         password = request.data.get('password')
+#         user = authenticate(username=username, password=password)
+#         if user is not None:
+#             login(request, user)
+#             return Response({"message": "Вход успешен."}, status=status.HTTP_200_OK)
+#         return Response({"error": "Неверные данные."}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-@api_view(["POST"])
-def logout(request):
-    return Response(status=status.HTTP_200_OK)
+# @api_view(["POST"])
+# def logout(request):
+#     return Response(status=status.HTTP_200_OK)
 
 @api_view(['DELETE'])
 def delete_apart_service_from_application(request, application_id, id_apartments):

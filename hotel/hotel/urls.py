@@ -20,6 +20,28 @@ from apartments.views import *
 from apartments import views
 
 from django.urls import include, path
+from rest_framework import permissions
+from django.urls import path, include
+
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+
+from rest_framework import routers
+router = routers.DefaultRouter()
+router.register(r'user', views.UserViewSet, basename='user')
+
+schema_view = get_schema_view(
+   openapi.Info(
+      title="Snippets API",
+      default_version='v1',
+      description="Test description",
+      terms_of_service="https://www.google.com/policies/terms/",
+      contact=openapi.Contact(email="contact@snippets.local"),
+      license=openapi.License(name="BSD License"),
+   ),
+   public=True,
+   permission_classes=(permissions.AllowAny,),
+)
 
 
 urlpatterns = [
@@ -29,6 +51,9 @@ urlpatterns = [
     path('apartments/<int:id_apartments>/', views.apartments_detail, name='apartments_detail'),
     path('apartments/addService/<int:id_apartments>/', views.addService, name='addService'),
     path('apartments/deleteService/<int:id>/', views.deleteService, name='deleteService'),
+
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('api/', include(router.urls)),
 
 
     # Набор методов для услуг
@@ -50,6 +75,7 @@ urlpatterns = [
     # Набор методов для пользователей
 	path('users/', views.UsersList.as_view(), name='users-list'),
 	path('user/<int:pk>/', views.UserDetail.as_view(), name='user'),
-	path('login/', views.UserLoginView.as_view(), name='user-login'),
-    path('logout/', logout), # POST
+	# path('login/', views.UserLoginView.as_view(), name='user-login'),
+    path('login/',  views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
 ]

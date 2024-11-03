@@ -1,0 +1,23 @@
+{% extends 'apartments/base.html' %}
+{% load static %}
+
+{% block css %}
+  <link rel="stylesheet" href={% static "/hotel_description.css"%}>
+{% endblock %}
+
+{% block content %}
+  <span  class="junior_suite">{{apartments.name}}</span>
+  <div class="image_1">
+    <img src="{{apartments.image}}" />
+  </div>
+  <div class="description">
+    <span  class="main_description">{{apartments.details}}</span>
+    <span  class="title_description" id="apartments.id">{{apartments.description}}</span>
+    <span  class="price">{{apartments.price}}</span>
+  </div>
+{% endblock %}
+
+
+
+
+

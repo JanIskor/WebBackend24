@@ -1,0 +1,69 @@
+{% extends 'apartments/base.html' %}
+{% load static %}
+
+{% block css %}
+  <link rel="stylesheet" href={% static "/hotel_menu.css"%}>
+{% endblock %}
+
+{% block content %}
+  <div class=field_search>
+    <form method="GET" action="{% url 'index_apart_hotel' %}" class="search-form">
+      {% csrf_token %}
+      <input type="text" class="search" name="apartment_name" placeholder="Поиск" value="{{ request.GET.apartment_name }}" >
+    </form>
+      <div class="main_search">
+      <img src={% static "/images/search.svg"%} class="search_sign">
+     </div>
+      {% if application_id == 0 or counter == 0 %}
+      <div class="basket">
+        <a class="nav-link" href="">
+          <img src="{% static '/images/basket.svg' %}" class="basket_sign"></img> 
+          <div class="number_sign">
+            <span  class="number">{{counter}}</span>
+          </div>
+        </a>
+      </div>
+    {% else %}
+      <div class="basket">
+        <a class="nav-link" href="{% url 'application_apartments_detail' application_id %}">
+          <img src="{% static '/images/basket.svg' %}" class="basket_sign"></img> 
+          <div class="number_sign">
+            <span  class="number">{{counter}}</span>
+          </div>
+        </a>
+      </div>
+    {% endif %}
+    </div>
+  </div>
+  </div><span  class="text_apartments">Апартаменты & услуги</span>
+  <div class=apartments>
+    {% for aparment in apartments %}
+      <div class=top_left>
+        <div class="top_cards_bg"></div>
+        <div class="image" id="{{aparment.id}}">
+          <img src="{{aparment.image}}" />
+        </div>
+        <div class=cards_text><span  class="text_header">{{aparment.name}}</span><span  class="text_description">{{aparment.description}}</span></div>
+        <div class="card_buttons">
+          <div class="top_cards_button">
+            <form class="nav-link" action="{% url 'apartments_detail' id_apartments=aparment.id %}" method="GET" enctype="multipart/form-data">
+              <button>
+                <div class="rectangle_6"></div>
+                <span  class="text_button">Подробнее</span>
+              </button>
+            </form>
+          </div>
+          <form action="{% url 'addService' aparment.id %}" method="post" class="top_cards_button2">
+            {% csrf_token %}
+            <button type="submit">
+              <div class="rectangle_6"></div>
+              <span  class="text_button2">Забронировать</span>
+            </button>
+          </form> 
+        </div>
+      </div>
+     {% endfor %}
+{% endblock %}
+
+
+

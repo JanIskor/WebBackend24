@@ -1,0 +1,53 @@
+{% extends 'apartments/base.html' %}
+{% load static %}
+
+{% block css %}
+  <link rel="stylesheet" href={% static "/hotel_application.css"%}>
+{% endblock %}
+
+{% block content %}
+  <span  class="main_header">Текущая заявка </span>
+  {% for application in apartments_in_application %}
+    <div class="start_date">
+      <div class="date_box"></div>
+      <span  class="date_text">С {{from|date:"d.m.Y"}}</span>
+    </div>
+    <div class="last_date">
+      <div class="date_box"></div>
+      <span  class="date_text">По {{to|date:"d.m.Y"}}</span>
+    </div>
+    <div class="card">
+      <div class="card_box"></div>
+      <div class="card_box_description">
+        <div class="image_box">
+          <div class="rectangle_8"></div>
+          <div class="image" id="{{application.id}}">
+            <img src="{{application.image}}" />
+          </div>
+        </div>
+        {% if application.parking_place %}
+          <div class="date">
+            <span  class="text_duration">Количество парковочных мест{{application.parking_place}}</span>
+            <input class="field_input" placeholder="Введи кол" type="text">
+          </div>
+        {% else %}
+          <div class="date">
+            <span  class="text_duration">Комментарий:</span>
+            <input class="field_input" placeholder="Введите комментарий" type="text" value="{{ application.comments_wishes }}">
+          </div> 
+        {% endif %}
+        <div class="main_service">
+          <span  class="description">{{application.name}}</span>
+          <span  class="bottom_date">Стоимость: {{application_amount}} </span></div>
+      </div>
+    </div>
+  {% endfor %}
+  <form action="{% url 'deleteService' application_id %}" method="post" class="bottom_button" value="delete">
+    {% csrf_token %}
+    <button type="submit">
+      <div class="rectangle_6"></div>
+      <span  class="text_button">Удалить</span>
+    </button>
+	</form>
+{% endblock %}
+

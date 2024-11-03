@@ -1,0 +1,127 @@
+body {
+	margin: 0px;
+}
+.main_page {
+	background-color: rgba(255, 255, 255, 1);
+	width: 1480px;
+	height: 982px;
+	position: absolute;
+}
+.header {
+	width: 1512px;
+	height: 150px;
+	position: absolute;
+	left: 0px;
+	top: -3px;
+}
+.header_box {
+	background-color: rgba(
+		217.0000022649765,
+		217.0000022649765,
+		217.0000022649765,
+		1
+	);
+	width: 1512px;
+	height: 150px;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+}
+.header_name {
+	color: rgba(0, 0, 0, 1);
+	width: 241px;
+	height: 86.79244995117188px;
+	position: absolute;
+	left: 600px;
+	top: 63.20754623413086px;
+	font-family: Inria Serif;
+	text-align: left;
+	font-size: 56px;
+	letter-spacing: 0;
+}
+.image_1 {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+}
+.image_1 img {
+	box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+	width: 720px;
+	height: 404px;
+	position: absolute;
+	left: 100px;
+	top: 278px;
+	border-radius: 10px;
+	background-repeat: no-repeat;
+	background-size: cover;
+}
+.junior_suite {
+	color: rgba(0, 0, 0, 1);
+	width: 215px;
+	height: 38px;
+	position: relative;
+	left: 612px;
+	top: 202px;
+	font-family: Inria Serif;
+	text-align: left;
+	font-size: 32px;
+	letter-spacing: 0;
+}
+.description {
+	width: 547px;
+	height: 361px;
+	position: absolute;
+	left: 883px;
+	top: 301px;
+	margin-top: 40px;
+}
+.title_description {
+	color: rgba(0, 0, 0, 1);
+	/* width: 188px;
+	height: 29px; */
+	position: relative;
+	/* left: 178px; */
+	top: 107px;
+	font-family: Inria Sans;
+	text-align: left;
+	font-size: 24px;
+	letter-spacing: 0;
+}
+
+.main_description {
+	color: rgba(0, 0, 0, 1);
+	width: 543px;
+	height: 100px;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	font-family: Inria Serif;
+	text-align: left;
+	font-size: 16px;
+	letter-spacing: 0;
+}
+.price {
+	color: rgba(0, 0, 0, 1);
+	/* width: 66px;
+	height: 24px; */
+	position: relative;
+	/* right: 275px; */
+	top: 170px;
+	font-family: Inria Serif;
+	text-align: left;
+	font-size: 20px;
+	letter-spacing: 0;
+}
+.back_button {
+	color: rgba(0, 0, 0, 1);
+	width: 75px;
+	height: 24px;
+	position: absolute;
+	left: 100px;
+	top: 213px;
+	font-family: Inria Serif;
+	text-align: left;
+	font-size: 20px;
+	letter-spacing: 0;
+	text-decoration: underline;
+}

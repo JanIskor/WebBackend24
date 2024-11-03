@@ -1,0 +1,18 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+    {% block css %}{% endblock %}
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>MARRIOT</title>
+	</head>
+<div class="main_page">
+  <div class="header">
+    <div class="header_box"></div>
+    <a class="nav-link" href="{% url 'index_apart_hotel' %}"><span  class="header_name">MARRIOT</span></a>
+  </div>
+  {% block content %}{% endblock %}
+</div>
+</html>

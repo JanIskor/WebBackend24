@@ -63,7 +63,7 @@ urlpatterns = [
     path('api/apart_service/<int:pk>/edit/', ApartHotelServiceEditingView.as_view(), name='apart-detail'),
 
     # Набор методов для заявок
-    path('api/application/', search_application),  # GET
+    path('applications/', views.ApplicationList.as_view(), name='apps-detail'),
     path('applications/<int:pk>/', views.ApplicationDetail.as_view(), name='apps-detail'),
     path('applications/<int:pk>/submit/', views.ApplicationFormingView.as_view(), name='apps-detail'),
     path('applications/<int:pk>/accept-reject/', views.ApplicationCompletingView.as_view(), name='apps-detail'),
@@ -71,11 +71,11 @@ urlpatterns = [
     # Набор методов для M:M
     path('apart_service_map/', views.ApplicationApartmentsList.as_view(), name="map-list"),
     path('apart_service_map/<int:pk>/', views.ApplicationApartmentsDetail.as_view(), name="map-detail"),
-    
+    path('apart_service_map/<int:application_id>/delete/<int:id_apartments>/', delete_apart_service_from_application, name="map-detail"),
+
     # Набор методов для пользователей
 	path('users/', views.UsersList.as_view(), name='users-list'),
 	path('user/<int:pk>/', views.UserDetail.as_view(), name='user'),
-	# path('login/', views.UserLoginView.as_view(), name='user-login'),
     path('login/',  views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
 ]

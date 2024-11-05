@@ -148,3 +148,5 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication',
     ]
 }
+REDIS_HOST = '0.0.0.0'
+REDIS_PORT = 6379

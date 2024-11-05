@@ -56,6 +56,8 @@ class Application(models.Model):
 
 
 
+
+
 class ApplicationApartments(models.Model):
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name='Заявка')
     aparthotel_service = models.ForeignKey(ApartHotelService, on_delete=models.CASCADE, related_name='Услуга')

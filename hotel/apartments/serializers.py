@@ -11,6 +11,8 @@ class ApplicationSerializer(serializers.ModelSerializer):
   complete_date = serializers.DateTimeField(format='%Y-%m-%d', allow_null=True, required=False)
   start_date = serializers.DateField(format='%Y-%m-%d', allow_null=True, required=False)
   final_date = serializers.DateField(format='%Y-%m-%d', allow_null=True, required=False)
+  creator = serializers.StringRelatedField()
+  moderator = serializers.StringRelatedField()
   class Meta:
       model = Application
       fields = [
@@ -46,14 +48,14 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "username", "password", "is_staff", "is_superuser"]
 
-  # def create(self, validated_data):
-  #       user = User.objects.create(
-  #           email=validated_data['email'],
-  #           username=validated_data['username']
-  #       )
+        # def create(self, validated_data):
+        #     user = User.objects.create(
+        #         email=validated_data['email'],
+        #         username=validated_data['username']
+        #     )
 
-  #       user.set_password(validated_data['password'])
-  #       user.save()
+        #     user.set_password(validated_data['password'])
+        #     user.save()
 
-  #       return user
+        #     return user
 

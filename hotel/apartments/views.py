@@ -30,10 +30,7 @@ from rest_framework.decorators import permission_classes, authentication_classes
 from .permissions import *
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import uuid
-import redis
 
-# Connect to our Redis instance
-session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 
 def index_apart_hotel(request):
     
@@ -160,31 +157,6 @@ def get_moderator():
 
 
 
-
-
-class ApplicationList(APIView):
-    model_class = Application
-    serializer_class = ApplicationSerializer
-    authentication_classes = [AuthBySessionID]
-    permission_classes = [IsAuthenticated]
-
-    @swagger_auto_schema(
-        operation_summary="Получить информацию о списке заявок"
-    )
-    def get(self, request, format=None):
-        start_date = request.query_params.get('date_formation_start', None)
-        end_date = request.query_params.get('date_formation_end', None)
-        status_ = request.query_params.get('status')
-        if request.user.is_staff:
-            object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
-        else:
-            object_list = self.model_class.objects.filter(creator=request.user).exclude(status__in=['deleted', 'draft'])
-        if status_:
-            object_list = object_list.filter(status=status_)
-
-        serializer = self.serializer_class(object_list, many=True)
-        return Response(serializer.data)
-
 class UserViewSet(ModelViewSet):
     """Класс, описывающий методы работы с пользователями
     Осуществляет связь с таблицей пользователей в базе данных
@@ -277,13 +249,17 @@ class ApartHotelServiceList(APIView):
         operation_summary="Получить список услуг апарт-отеля"
     )
     def get(self, request, format=None):
+        apart_hotel_service_name = request.GET.get("apart_hotel_service_name", "")
         apart_hotel_service = self.model_class.objects.filter(status=1).order_by('price')
+
+        if apart_hotel_service_name:
+            apart_hotel_service = apart_hotel_service.filter(name__icontains=apart_hotel_service_name)
         serializer = self.serializer_class(apart_hotel_service, many=True)
+
         user_draft_apps = Application.objects.filter(status='draft')
         if user_draft_apps.exists():
             draft_app_id = user_draft_apps.first().id
             quantity = ApplicationApartments.objects.filter(application_id=draft_app_id).count()
-
         else:
             draft_app_id = None
             quantity = 0
@@ -375,7 +351,69 @@ class ApartHotelServiceDetail(APIView):
                     status=status.HTTP_201_CREATED
                 )
 
+class ApartHotelServiceEditingView(APIView):
+    model_class = ApartHotelService
+    serializer_class = ApartHotelServiceSerializer
+
+    @swagger_auto_schema(
+        request_body=ApartHotelServiceSerializer,
+        operation_summary="Изменить информацию об услуге"
+    )
+    # Обновляет информацию об элементе
+    def put(self, request, pk, format=None):
+        apart_service = get_object_or_404(self.model_class, pk=pk)
+        serializer = self.serializer_class(apart_service, data=request.data, partial=True)
+        # Изменение фото 
+        if 'pic' in serializer.initial_data:
+            pic_result = add_pic(apart_service, serializer.initial_data['pic'])
+            if 'error' in pic_result.data:
+                return pic_result
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+        request_body=ApartHotelServiceSerializer,
+        operation_summary="Заменить фотографию"
+    )
+    # Заменяет картинку, удаляя предыдущую
+    def post(self, request, pk, format=None):
+        apart_service = get_object_or_404(self.model_class, pk=pk)
+
+        # Проверяем наличие нового изображения
+        if 'pic' in request.data:
+            # Удаляем старое изображение, если оно существует
+            if apart_service.image:
+                delete_result = delete_pic(apart_service.image.split("/")[-1])  # Удаляем изображение по имени
+                if 'error' in delete_result:
+                    return Response(delete_result, status=status.HTTP_400_BAD_REQUEST)
+
+            # Загружаем новое изображение
+            pic_result = add_pic(apart_service, request.data['pic'])
+            if 'error' in pic_result.data:
+                return pic_result
+
+        return Response({"message": "Изображение успешно обновлено"}, status=status.HTTP_200_OK)
+   
 # /////////////////////////
+class ApplicationList(APIView):
+    model_class = Application
+    serializer_class = ApplicationSerializer
+
+
+    def get(self, request, format=None):
+        start_date = request.query_params.get('date_formation_start', None)
+        end_date = request.query_params.get('date_formation_end', None)
+        status_ = request.query_params.get('status')
+        object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
+
+        if status_:
+            object_list = object_list.filter(status=status_)
+
+        serializer = self.serializer_class(object_list, many=True)
+        return Response(serializer.data)
+
 class ApplicationDetail(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
@@ -437,9 +475,6 @@ class ApplicationFormingView(APIView):
     def put(self, request, pk, format=None):
         user_instance = get_user()
 
-        # Проверяем, является ли текущий пользователь модератором
-        # if not user_instance.is_staff:
-        #     return Response({'error': 'Текущий пользователь не является модератором'}, status=status.HTTP_403_FORBIDDEN)
 
         application = get_object_or_404(Application, pk=pk)
 
@@ -461,99 +496,40 @@ class ApplicationFormingView(APIView):
 class ApplicationCompletingView(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
-    permission_classes = [IsManager]
-    authentication_classes = [AuthBySessionID]
 
-    @swagger_auto_schema(
-        operation_summary="Посмотреть заявку"
-    )
     def get(self, request, pk, format=None):
         application = get_object_or_404(self.model_class, pk=pk)
         serializer = self.serializer_class(application)
         return Response(serializer.data)
 
-    @swagger_auto_schema(
-        request_body=ApplicationSerializer,
-        operation_summary="Завершить или отклонить заявку, обновив её статус"
-    )
+
     def put(self, request, pk, format=None):
-        # user_instance = get_user()
+        user_instance = get_user()
         application = get_object_or_404(Application, pk=pk)
-        if request.user.id != application.creator_id:
-            application.moderator_id = request.user.id
-            print(request.user.id)
-        # Проверяем, является ли текущий пользователь модератором
-        if not user_instance.is_staff:
-            return Response({'error': 'Текущий пользователь не является модератором'}, status=status.HTTP_403_FORBIDDEN)
 
-            # Проверяем, что заявка имеет статус "Сформирована"
-            if application.status != 'created':
-                return Response({'error': 'Заявка может быть завершена или отклонена только в статусе "Сформирована"'}, status=status.HTTP_403_FORBIDDEN)
+        # Проверяем, что заявка имеет статус "Сформирована"
+        if application.status != 'created':
+            return Response({'error': 'Заявка может быть завершена или отклонена только в статусе "Сформирована"'}, status=status.HTTP_403_FORBIDDEN)
 
-            # Проверяем, что в запросе передан статус
-            new_status = request.data.get('status')
-            if new_status not in ['completed', 'rejected']:
-                return Response({'error': 'Недопустимый статус. Ожидался статус "Завершёна" или "Отклонёна"'}, status=status.HTTP_400_BAD_REQUEST)
+        # Проверяем, что в запросе передан статус
+        new_status = request.data.get('status')
+        if new_status not in ['completed', 'rejected']:
+            return Response({'error': 'Недопустимый статус. Ожидался статус "Завершёна" или "Отклонёна"'}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Устанавливаем новый статус заявки
-            application.status = new_status
-            application.moderator = user_instance  # Устанавливаем текущего пользователя как модератора
-            application.completed_at = timezone.now()  # Устанавливаем дату завершения
+        # Устанавливаем новый статус заявки
+        application.status = new_status
+        application.moderator = user_instance  # Устанавливаем текущего пользователя как модератора
+        application.completed_at = timezone.now()  # Устанавливаем дату завершения
 
-            total_price = application.calculate_total_price()  # Предполагается, что этот метод возвращает сумму
-            application.total_price = total_price 
-            application.save()
+        total_price = application.calculate_total_price()  # Предполагается, что этот метод возвращает сумму
+        application.total_price = total_price 
+        application.save()
 
-            serializer = ApplicationSerializer(application)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        print(request.user)
-        return Response({'error': "Permissiod denied. Is creator!"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ApplicationSerializer(application)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 # /////////////////////////////
-class ApartHotelServiceEditingView(APIView):
-    model_class = ApartHotelService
-    serializer_class = ApartHotelServiceSerializer
 
-    @swagger_auto_schema(
-        request_body=ApartHotelServiceSerializer,
-        operation_summary="Изменить информацию об услуге"
-    )
-    # Обновляет информацию об элементе
-    def put(self, request, pk, format=None):
-        apart_service = get_object_or_404(self.model_class, pk=pk)
-        serializer = self.serializer_class(apart_service, data=request.data, partial=True)
-        # Изменение фото 
-        if 'pic' in serializer.initial_data:
-            pic_result = add_pic(apart_service, serializer.initial_data['pic'])
-            if 'error' in pic_result.data:
-                return pic_result
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @swagger_auto_schema(
-        request_body=ApartHotelServiceSerializer,
-        operation_summary="Заменить фотографию"
-    )
-    # Заменяет картинку, удаляя предыдущую
-    def post(self, request, pk, format=None):
-        apart_service = get_object_or_404(self.model_class, pk=pk)
-
-        # Проверяем наличие нового изображения
-        if 'pic' in request.data:
-            # Удаляем старое изображение, если оно существует
-            if apart_service.image:
-                delete_result = delete_pic(apart_service.image.split("/")[-1])  # Удаляем изображение по имени
-                if 'error' in delete_result:
-                    return Response(delete_result, status=status.HTTP_400_BAD_REQUEST)
-
-            # Загружаем новое изображение
-            pic_result = add_pic(apart_service, request.data['pic'])
-            if 'error' in pic_result.data:
-                return pic_result
-
-        return Response({"message": "Изображение успешно обновлено"}, status=status.HTTP_200_OK)
-   
 # ///////////////////////
 class UsersList(APIView):
     model_class = User
@@ -649,27 +625,15 @@ def delete_apart_service_from_application(request, application_id, id_apartments
 @swagger_auto_schema(method='post', request_body=UserSerializer, operation_summary="Аутентификация")
 @api_view(['Post'])
 def login_view(request): 
-    # username = request.data["username"]  # допустим передали username и password
-    # password = request.data["password"]
     username = request.data.get('username')  # допустим передали username и password
     password = request.data.get('password')
     user = authenticate(request, username=username, password=password)
     print(username, password)
-    # if user is not None:
-    #     login(request, user)
-    #     return HttpResponse("{'status': 'ok'}")
-    # else:
-    #     return HttpResponse("{'status': 'error', 'error': 'login failed'}")
     if user is not None:
-        random_key = str(uuid.uuid4())
-        session_storage.set(random_key, username)
-
-        response = HttpResponse("{'status': 'ok'}")
-        response.set_cookie("session_id", random_key)
-
         login(request, user)
-        return Response({"message": "Вход успешен."}, status=status.HTTP_200_OK)
-    return Response({"error": "Неверные данные."}, status=status.HTTP_401_UNAUTHORIZED)
+        return HttpResponse("{'status': 'ok'}")
+    else:
+        return HttpResponse("{'status': 'error', 'error': 'login failed'}")
 
 
 

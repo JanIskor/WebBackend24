@@ -143,84 +143,23 @@ def get_user():
 def get_moderator():
     return User.objects.filter(is_superuser=True).first()
 
-
-
-
-
-@api_view(["GET"])
-def search_application(request):
-    status = int(request.GET.get("status", 0))
-    date_formation_start = request.GET.get("date_formation_start")
-    date_formation_end = request.GET.get("date_formation_end")
-
-    application = Application.objects.exclude(status__in=["draft", "rejected"])
-
-    if status > 0:
-        application = application.filter(status=status)
-
-    if date_formation_start and parse_datetime(date_formation_start):
-        application = application.filter(date_formation__gte=parse_datetime(date_formation_start))
-
-    if date_formation_end and parse_datetime(date_formation_end):
-        application = application.filter(date_formation__lt=parse_datetime(date_formation_end))
-
-    serializer = ApplicationSerializer(application, many=True)
-
-    return Response(serializer.data)
-
-
-class ApplicationApartmentsList(APIView):
-    model_class = ApplicationApartments
-    serializer_class = ApplicationApartmentsSerializer
-    def get(self, request, format=None):
-        apps_apart = self.model_class.objects.all()
-        serializer = self.serializer_class(apps_apart, many=True)
-        return Response(serializer.data)
-        
-class ApplicationApartmentsDetail(APIView):
-    model_class = ApplicationApartments
-    serializer_class = ApplicationApartmentsSerializer
-
-    def get(self, request, pk, format=None):
-        apart_hotel_service = get_object_or_404(self.model_class, pk=pk)
-        serializer = self.serializer_class(apart_hotel_service)
-        return Response(serializer.data)
-
-    def delete(self, request, pk, format=None):
-        app_apart = get_object_or_404(self.model_class, pk=pk)
-        if Application.objects.get(id=app_apart.application_id).status == 'draft':
-            serializer = self.serializer_class(app_apart, data={'application': None, 'aparthotel_service': None, 'comments_wishes': None})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
-
-    def put(self, request, pk, format=None):
-        app_apart = get_object_or_404(self.model_class, pk=pk)
-        if Application.objects.get(id=app_apart.application_id).status == 'draft':
-            updated_data = {key: value for key, value in request.data.items() if key in ['comments_wishes']}
-            serializer = self.serializer_class(app_apart, data=updated_data, partial=True)
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        return Response(status=status.HTTP_400_BAD_REQUEST)
-
-
 # //////////////////////////
 class ApartHotelServiceList(APIView):
     model_class = ApartHotelService
     serializer_class = ApartHotelServiceSerializer
 
     def get(self, request, format=None):
+        apart_hotel_service_name = request.GET.get("apart_hotel_service_name", "")
         apart_hotel_service = self.model_class.objects.filter(status=1).order_by('price')
+
+        if apart_hotel_service_name:
+            apart_hotel_service = apart_hotel_service.filter(name__icontains=apart_hotel_service_name)
         serializer = self.serializer_class(apart_hotel_service, many=True)
+
         user_draft_apps = Application.objects.filter(status='draft')
         if user_draft_apps.exists():
             draft_app_id = user_draft_apps.first().id
             quantity = ApplicationApartments.objects.filter(application_id=draft_app_id).count()
-
         else:
             draft_app_id = None
             quantity = 0
@@ -297,7 +236,61 @@ class ApartHotelServiceDetail(APIView):
                     status=status.HTTP_201_CREATED
                 )
 
+class ApartHotelServiceEditingView(APIView):
+    model_class = ApartHotelService
+    serializer_class = ApartHotelServiceSerializer
+
+    # Обновляет информацию об элементе
+    def put(self, request, pk, format=None):
+        apart_service = get_object_or_404(self.model_class, pk=pk)
+        serializer = self.serializer_class(apart_service, data=request.data, partial=True)
+        # Изменение фото 
+        if 'pic' in serializer.initial_data:
+            pic_result = add_pic(apart_service, serializer.initial_data['pic'])
+            if 'error' in pic_result.data:
+                return pic_result
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    # Заменяет картинку, удаляя предыдущую
+    def post(self, request, pk, format=None):
+        apart_service = get_object_or_404(self.model_class, pk=pk)
+
+        # Проверяем наличие нового изображения
+        if 'pic' in request.data:
+            # Удаляем старое изображение, если оно существует
+            if apart_service.image:
+                delete_result = delete_pic(apart_service.image.split("/")[-1])  # Удаляем изображение по имени
+                if 'error' in delete_result:
+                    return Response(delete_result, status=status.HTTP_400_BAD_REQUEST)
+
+            # Загружаем новое изображение
+            pic_result = add_pic(apart_service, request.data['pic'])
+            if 'error' in pic_result.data:
+                return pic_result
+
+        return Response({"message": "Изображение успешно обновлено"}, status=status.HTTP_200_OK)
+
 # /////////////////////////
+class ApplicationList(APIView):
+    model_class = Application
+    serializer_class = ApplicationSerializer
+
+
+    def get(self, request, format=None):
+        start_date = request.query_params.get('date_formation_start', None)
+        end_date = request.query_params.get('date_formation_end', None)
+        status_ = request.query_params.get('status')
+        object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
+
+        if status_:
+            object_list = object_list.filter(status=status_)
+
+        serializer = self.serializer_class(object_list, many=True)
+        return Response(serializer.data)
+
 class ApplicationDetail(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
@@ -342,10 +335,6 @@ class ApplicationFormingView(APIView):
     def put(self, request, pk, format=None):
         user_instance = get_user()
 
-        # Проверяем, является ли текущий пользователь модератором
-        # if not user_instance.is_staff:
-        #     return Response({'error': 'Текущий пользователь не является модератором'}, status=status.HTTP_403_FORBIDDEN)
-
         application = get_object_or_404(Application, pk=pk)
 
         # Проверяем, что заявка имеет статус "Сформирована"
@@ -356,9 +345,6 @@ class ApplicationFormingView(APIView):
         application.status = 'created'
         application.moderator = user_instance  # Устанавливаем текущего пользователя как модератора
         application.update_date = timezone.now()  # Устанавливаем дату изменения
-
-        # Подсчитываем итоговую стоимость услуг для этой заявки
-        application.calculate_total_price()
 
         application.save()
 
@@ -378,10 +364,6 @@ class ApplicationCompletingView(APIView):
     def put(self, request, pk, format=None):
         user_instance = get_user()
 
-        # Проверяем, является ли текущий пользователь модератором
-        # if not user_instance.is_staff:
-        #     return Response({'error': 'Текущий пользователь не является модератором'}, status=status.HTTP_403_FORBIDDEN)
-
         application = get_object_or_404(Application, pk=pk)
 
         # Проверяем, что заявка имеет статус "Сформирована"
@@ -398,50 +380,52 @@ class ApplicationCompletingView(APIView):
         application.moderator = user_instance  # Устанавливаем текущего пользователя как модератора
         application.completed_at = timezone.now()  # Устанавливаем дату завершения
 
+        total_price = application.calculate_total_price()  # Предполагается, что этот метод возвращает сумму
+        application.total_price = total_price 
         application.save()
-        application.calculate_total_price()
 
         serializer = ApplicationSerializer(application)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-# /////////////////////////////
-class ApartHotelServiceEditingView(APIView):
-    model_class = ApartHotelService
-    serializer_class = ApartHotelServiceSerializer
+# /////////
+class ApplicationApartmentsList(APIView):
+    model_class = ApplicationApartments
+    serializer_class = ApplicationApartmentsSerializer
+    def get(self, request, format=None):
+        apps_apart = self.model_class.objects.all()
+        serializer = self.serializer_class(apps_apart, many=True)
+        return Response(serializer.data)
+        
+class ApplicationApartmentsDetail(APIView):
+    model_class = ApplicationApartments
+    serializer_class = ApplicationApartmentsSerializer
 
-    # Обновляет информацию об элементе
+    def get(self, request, pk, format=None):
+        apart_hotel_service = get_object_or_404(self.model_class, pk=pk)
+        serializer = self.serializer_class(apart_hotel_service)
+        return Response(serializer.data)
+
+    def delete(self, request, pk, format=None):
+        app_apart = get_object_or_404(self.model_class, pk=pk)
+        if Application.objects.get(id=app_apart.application_id).status == 'draft':
+            serializer = self.serializer_class(app_apart, data={'application': None, 'aparthotel_service': None, 'comments_wishes': None})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_400_BAD_REQUEST)
+
     def put(self, request, pk, format=None):
-        apart_service = get_object_or_404(self.model_class, pk=pk)
-        serializer = self.serializer_class(apart_service, data=request.data, partial=True)
-        # Изменение фото 
-        if 'pic' in serializer.initial_data:
-            pic_result = add_pic(apart_service, serializer.initial_data['pic'])
-            if 'error' in pic_result.data:
-                return pic_result
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        app_apart = get_object_or_404(self.model_class, pk=pk)
+        if Application.objects.get(id=app_apart.application_id).status == 'draft':
+            updated_data = {key: value for key, value in request.data.items() if key in ['comments_wishes']}
+            serializer = self.serializer_class(app_apart, data=updated_data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(status=status.HTTP_400_BAD_REQUEST) 
 
-    # Заменяет картинку, удаляя предыдущую
-    def post(self, request, pk, format=None):
-        apart_service = get_object_or_404(self.model_class, pk=pk)
-
-        # Проверяем наличие нового изображения
-        if 'pic' in request.data:
-            # Удаляем старое изображение, если оно существует
-            if apart_service.image:
-                delete_result = delete_pic(apart_service.image.split("/")[-1])  # Удаляем изображение по имени
-                if 'error' in delete_result:
-                    return Response(delete_result, status=status.HTTP_400_BAD_REQUEST)
-
-            # Загружаем новое изображение
-            pic_result = add_pic(apart_service, request.data['pic'])
-            if 'error' in pic_result.data:
-                return pic_result
-
-        return Response({"message": "Изображение успешно обновлено"}, status=status.HTTP_200_OK)
-   
 # ///////////////////////
 class UsersList(APIView):
     model_class = User

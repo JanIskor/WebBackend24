@@ -30,7 +30,10 @@ from rest_framework.decorators import permission_classes, authentication_classes
 from .permissions import *
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import uuid
+# import redis
 
+# # Connect to our Redis instance
+# session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 
 def index_apart_hotel(request):
     
@@ -400,14 +403,32 @@ class ApartHotelServiceEditingView(APIView):
 class ApplicationList(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
-
-
+    # authentication_classes = [AuthBySessionID]
+    @swagger_auto_schema(
+        operation_summary="Посмотреть заявки"
+    )
     def get(self, request, format=None):
         start_date = request.query_params.get('date_formation_start', None)
         end_date = request.query_params.get('date_formation_end', None)
         status_ = request.query_params.get('status')
-        object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
+        # object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])1
 
+        if request.user.is_authenticated:
+            # Если пользователь аутентифицирован, проверяем его роль
+            if request.user.is_superuser or request.user.is_staff:  # Для администраторов
+                object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
+            else:
+                # Для создателей возвращаем только их заявки
+                object_list = self.model_class.objects.filter(creator=request.user).exclude(status__in=['deleted', 'draft'])
+        else:
+            # Если пользователь не аутентифицирован, возвращаем 401/403
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # if request.user.is_staff: 2
+        #     object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
+        # else:
+        #     object_list = self.model_class.objects.filter(creator=request.user).exclude(status="draft").exclude(
+        #     status="draft")
         if status_:
             object_list = object_list.filter(status=status_)
 
@@ -496,6 +517,8 @@ class ApplicationFormingView(APIView):
 class ApplicationCompletingView(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
+    permission_classes = [IsAdmin | IsManager]
+    # authentication_classes = [AuthBySessionID]
 
     def get(self, request, pk, format=None):
         application = get_object_or_404(self.model_class, pk=pk)
@@ -625,10 +648,22 @@ def delete_apart_service_from_application(request, application_id, id_apartments
 @swagger_auto_schema(method='post', request_body=UserSerializer, operation_summary="Аутентификация")
 @api_view(['Post'])
 def login_view(request): 
-    username = request.data.get('username')  # допустим передали username и password
-    password = request.data.get('password')
+    username = request.data["username"]  # допустим передали username и password
+    password = request.data["password"]
     user = authenticate(request, username=username, password=password)
     print(username, password)
+    # if user is not None:
+    #     random_key = str(uuid.uuid4())
+    #     session_storage.set(random_key, username)
+    #     print(random_key, username)
+
+    #     response = HttpResponse("{'status': 'ok'}")
+    #     response.set_cookie("sessionid", random_key)
+    #     print(random_key)
+
+    #     # login(request, user)
+    #     return Response({"message": "Вход успешен."}, status=status.HTTP_200_OK)
+    # return Response({"error": "Неверные данные."}, status=status.HTTP_401_UNAUTHORIZED)
     if user is not None:
         login(request, user)
         return HttpResponse("{'status': 'ok'}")
@@ -636,10 +671,13 @@ def login_view(request):
         return HttpResponse("{'status': 'error', 'error': 'login failed'}")
 
 
-
+@csrf_exempt
+@api_view(['POST'])
+@permission_classes([AllowAny])
 def logout_view(request):
-    logout(request._request)
-    return Response({'status': 'Success'})
+
+    logout(request)
+    return Response({'status': 'Success'}, status=status.HTTP_200_OK)
 
 
 

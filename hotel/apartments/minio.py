@@ -6,7 +6,7 @@ from rest_framework.response import *
 def process_file_upload(file_object: InMemoryUploadedFile, client, image_name):
     try:
         client.put_object('hotel', image_name, file_object, file_object.size)
-        return f"http://127.0.0.1:9000/hotel/images/{image_name}"
+        return f"http://127.0.0.1:9000/hotel/{image_name}"
     except Exception as e:
         return {"error": str(e)}
 
@@ -18,7 +18,7 @@ def add_pic(new_configuration_element, pic):
            secure=settings.MINIO_USE_SSL
     )
     i = new_configuration_element.id
-    img_obj_name = f"{i}.png"
+    img_obj_name = f"images/{i}.png"
 
     if not pic:
         return Response({"error": "Нет файла для изображения логотипа."})

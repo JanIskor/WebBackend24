@@ -280,14 +280,19 @@ class ApplicationList(APIView):
 
 
     def get(self, request, format=None):
-        start_date = request.query_params.get('date_formation_start', None)
-        end_date = request.query_params.get('date_formation_end', None)
+        start_date = request.query_params.get('start_date', None)
+        end_date = request.query_params.get('end_date', None)
         status_ = request.query_params.get('status')
         object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
 
         if status_:
             object_list = object_list.filter(status=status_)
 
+        # Применяем фильтрацию по дате создания, если параметры указаны
+        if end_date:
+            object_list = object_list.filter(create_date__lte=end_date)
+        if start_date:
+            object_list = object_list.filter(create_date__gte=start_date)
         serializer = self.serializer_class(object_list, many=True)
         return Response(serializer.data)
 

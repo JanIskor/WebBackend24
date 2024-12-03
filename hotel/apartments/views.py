@@ -19,7 +19,7 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login, logout
 
-from .serializers import ApplicationSerializer, ApartHotelServiceSerializer, ApplicationApartmentsSerializer, UserSerializer
+from .serializers import ApplicationSerializer, ApartHotelServiceSerializer, ApplicationApartmentsSerializer, UserSerializer, UserLoginSerializer
 
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.viewsets import ModelViewSet
@@ -30,10 +30,10 @@ from rest_framework.decorators import permission_classes, authentication_classes
 from .permissions import *
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
 import uuid
-# import redis
+import redis
 
-# # Connect to our Redis instance
-# session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
+# Connect to our Redis instance
+session_storage = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT)
 
 def index_apart_hotel(request):
     
@@ -403,15 +403,31 @@ class ApartHotelServiceEditingView(APIView):
 class ApplicationList(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
-    # authentication_classes = [AuthBySessionID]
+    permission_classes = [AllowAny]
+    authentication_classes = [AuthBySessionID]
+
     @swagger_auto_schema(
         operation_summary="Посмотреть заявки"
     )
     def get(self, request, format=None):
+        # Получаем session_id из куки
+        session_id = request.COOKIES.get("sessionid")
+        if not session_id:
+            return Response({"error": "Необходима аутентификация."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Проверяем сессию
+        user_id = session_storage.get(session_id)
+        if not user_id:
+            return Response({"error": "Сессия недействительна."}, status=status.HTTP_401_UNAUTHORIZED)
+        # # Проверяем существование пользователя
+        # user_instance = User.objects.filter(pk=user_id).first()
+        # if not user_instance:
+        #     return Response({"error": "Пользователь не найден."}, status=status.HTTP_400_BAD_REQUEST)
+        
         start_date = request.query_params.get('date_formation_start', None)
         end_date = request.query_params.get('date_formation_end', None)
         status_ = request.query_params.get('status')
-        # object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])1
+        # object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
 
         if request.user.is_authenticated:
             # Если пользователь аутентифицирован, проверяем его роль
@@ -422,7 +438,7 @@ class ApplicationList(APIView):
                 object_list = self.model_class.objects.filter(creator=request.user).exclude(status__in=['deleted', 'draft'])
         else:
             # Если пользователь не аутентифицирован, возвращаем 401/403
-            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'detail': 'Authentication credentials were not provided.Attention!!!'}, status=status.HTTP_401_UNAUTHORIZED)
 
         # if request.user.is_staff: 2
         #     object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
@@ -518,7 +534,7 @@ class ApplicationCompletingView(APIView):
     model_class = Application
     serializer_class = ApplicationSerializer
     permission_classes = [IsAdmin | IsManager]
-    # authentication_classes = [AuthBySessionID]
+    authentication_classes = [AuthBySessionID]
 
     def get(self, request, pk, format=None):
         application = get_object_or_404(self.model_class, pk=pk)
@@ -652,23 +668,28 @@ def login_view(request):
     password = request.data["password"]
     user = authenticate(request, username=username, password=password)
     print(username, password)
-    # if user is not None:
-    #     random_key = str(uuid.uuid4())
-    #     session_storage.set(random_key, username)
-    #     print(random_key, username)
+    if user is not None:
+        random_key = str(uuid.uuid4())
+        session_storage.set(random_key, username)
+        print(random_key, username)
 
-    #     response = HttpResponse("{'status': 'ok'}")
-    #     response.set_cookie("sessionid", random_key)
-    #     print(random_key)
+        response = HttpResponse("{'status': 'ok'}")
+        response.set_cookie("sessionid", random_key)
+        print(random_key)
 
-    #     # login(request, user)
+        # login(request, user)
     #     return Response({"message": "Вход успешен."}, status=status.HTTP_200_OK)
     # return Response({"error": "Неверные данные."}, status=status.HTTP_401_UNAUTHORIZED)
-    if user is not None:
-        login(request, user)
-        return HttpResponse("{'status': 'ok'}")
+        return response
     else:
         return HttpResponse("{'status': 'error', 'error': 'login failed'}")
+    
+    # if user is not None:
+    #     login(request, user)
+    #     return HttpResponse("{'status': 'ok'}")
+    # else:
+    #     return HttpResponse("{'status': 'error', 'error': 'login failed'}")
+
 
 
 @csrf_exempt

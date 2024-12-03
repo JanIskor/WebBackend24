@@ -46,7 +46,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "password", "is_staff", "is_superuser"]
+        fields = ["id", "username", "password"]
 
         # def create(self, validated_data):
         #     user = User.objects.create(
@@ -59,3 +59,6 @@ class UserSerializer(serializers.ModelSerializer):
 
         #     return user
 
+class UserLoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(required=True)

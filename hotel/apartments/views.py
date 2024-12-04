@@ -304,6 +304,9 @@ class ApplicationDetail(APIView):
     def get(self, request, pk, format=None):
         application = get_object_or_404(self.model_class, pk=pk)
         serializer = self.serializer_class(application)
+
+        if application.status == 'rejected':
+            return Response({'error': 'Заявка удалена'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data)
 
     # Обновляет доп поля заявки

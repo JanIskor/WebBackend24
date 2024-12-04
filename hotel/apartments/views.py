@@ -19,7 +19,7 @@ from rest_framework import status, permissions
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate, login, logout
 
-from .serializers import ApplicationSerializer, ApartHotelServiceSerializer, ApplicationApartmentsSerializer, UserSerializer, UserLoginSerializer
+from .serializers import ApplicationSerializer, ApartHotelServiceSerializer, ApplicationApartmentsSerializer, UserSerializer
 
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework.viewsets import ModelViewSet
@@ -419,13 +419,9 @@ class ApplicationList(APIView):
         user_id = session_storage.get(session_id)
         if not user_id:
             return Response({"error": "Сессия недействительна."}, status=status.HTTP_401_UNAUTHORIZED)
-        # # Проверяем существование пользователя
-        # user_instance = User.objects.filter(pk=user_id).first()
-        # if not user_instance:
-        #     return Response({"error": "Пользователь не найден."}, status=status.HTTP_400_BAD_REQUEST)
         
-        start_date = request.query_params.get('date_formation_start', None)
-        end_date = request.query_params.get('date_formation_end', None)
+        start_date = request.query_params.get('start_date', None)
+        end_date = request.query_params.get('end_date', None)
         status_ = request.query_params.get('status')
         # object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
 
@@ -440,14 +436,14 @@ class ApplicationList(APIView):
             # Если пользователь не аутентифицирован, возвращаем 401/403
             return Response({'detail': 'Authentication credentials were not provided.Attention!!!'}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # if request.user.is_staff: 2
-        #     object_list = self.model_class.objects.exclude(status__in=["draft", "rejected"])
-        # else:
-        #     object_list = self.model_class.objects.filter(creator=request.user).exclude(status="draft").exclude(
-        #     status="draft")
         if status_:
             object_list = object_list.filter(status=status_)
 
+        # Применяем фильтрацию по дате создания, если параметры указаны
+        if end_date:
+            object_list = object_list.filter(create_date__lte=end_date)
+        if start_date:
+            object_list = object_list.filter(create_date__gte=start_date)
         serializer = self.serializer_class(object_list, many=True)
         return Response(serializer.data)
 
@@ -462,6 +458,9 @@ class ApplicationDetail(APIView):
     def get(self, request, pk, format=None):
         application = get_object_or_404(self.model_class, pk=pk)
         serializer = self.serializer_class(application)
+
+        if application.status == 'rejected':
+            return Response({'error': 'Заявка удалена'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data)
 
     @swagger_auto_schema(

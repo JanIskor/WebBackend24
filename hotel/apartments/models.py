@@ -44,6 +44,7 @@ class Application(models.Model):
     final_date = models.DateField(default=timezone.now, verbose_name='Дата выезда')
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='draft', verbose_name='Статус заявки')
+    apart_service = models.ForeignKey(ApartHotelService, verbose_name="Услуги апарт-отеля", on_delete=models.SET_NULL, default=0, blank=True, null=True, related_name="apart_service")
 
     class Meta:
         db_table = 'applications'
